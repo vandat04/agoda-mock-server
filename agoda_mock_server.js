@@ -10,8 +10,11 @@ const fs = require('fs');
 const path = require('path');
 const url = require('url');
 
-const PORT = 3000;
-const CHECKINX_API_URL = 'http://localhost:8080/api/admin/ota-channels/booking';
+const PORT = process.env.PORT || 3000;
+const CHECKINX_BASE_URL = process.env.RENDER
+    ? 'https://hotel-booking-v3.onrender.com/api'
+    : 'http://localhost:8080/api';
+const CHECKINX_API_URL = `${CHECKINX_BASE_URL}/admin/ota-channels/booking`;
 
 // Bộ nhớ đệm lưu danh sách đặt phòng giả lập trên Agoda (Được lưu trong file mock_bookings.json để tránh mất khi restart)
 const BOOKINGS_FILE = path.join(__dirname, 'mock_bookings.json');
@@ -105,7 +108,7 @@ function formatDateToICal(dateStr) {
 
 // Hàm tải lịch trống từ CheckinX và phân tích các ngày đã bán hết
 function fetchAndParseCheckinxCalendar(roomTypeId, callback) {
-    const icalUrl = `http://localhost:8080/api/ical/room-type/${roomTypeId}.ics`;
+    const icalUrl = `${CHECKINX_BASE_URL}/ical/room-type/${roomTypeId}.ics`;
     
     http.get(icalUrl, (res) => {
         if (res.statusCode !== 200) {
