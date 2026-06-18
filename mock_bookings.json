@@ -1,0 +1,98 @@
+[
+  {
+    "bookingId": "AGD-17263541",
+    "guestName": "Nguyen Van A",
+    "guestPhone": "0912345678",
+    "guestEmail": "nguyenvana@gmail.com",
+    "roomTypeCode": "DELUXE",
+    "checkIn": "2026-07-01",
+    "checkOut": "2026-07-03",
+    "amount": 1500000,
+    "status": "CONFIRMED",
+    "createdAt": "2026-06-19T02:13:00.000Z"
+  },
+  {
+    "bookingId": "AGD-19062026",
+    "guestName": "Nguyen Van A",
+    "guestPhone": "0912345678",
+    "guestEmail": "guest@gmail.com",
+    "roomTypeCode": "DELUXE",
+    "checkIn": "2026-06-19",
+    "checkOut": "2026-06-20",
+    "amount": 750000,
+    "status": "CONFIRMED",
+    "createdAt": "2026-06-19T02:10:00.000Z"
+  },
+  {
+    "bookingId": "AGD-17062026",
+    "guestName": "Nguyen Van A",
+    "guestPhone": "0912345678",
+    "guestEmail": "guest@gmail.com",
+    "roomTypeCode": "DELUXE",
+    "checkIn": "2026-06-17",
+    "checkOut": "2026-06-18",
+    "amount": 750000,
+    "status": "CONFIRMED",
+    "createdAt": "2026-06-19T02:05:00.000Z"
+  },
+  {
+    "bookingId": "AGD-16549139",
+    "guestName": "A",
+    "guestPhone": "0912345678",
+    "guestEmail": "guest@gmail.com",
+    "roomTypeCode": "DELUXE",
+    "checkIn": "2026-06-23",
+    "checkOut": "2026-06-24",
+    "amount": 750000,
+    "status": "CONFIRMED",
+    "createdAt": "2026-06-19T02:20:25.000Z"
+  },
+  {
+    "bookingId": "AGD-53697988",
+    "guestName": "A",
+    "guestPhone": "0456456456",
+    "guestEmail": "truongvandat02112004@gmail.com",
+    "roomTypeCode": "DELUXE",
+    "checkIn": "2026-06-24",
+    "checkOut": "2026-06-25",
+    "amount": 750000,
+    "status": "CONFIRMED",
+    "createdAt": "2026-06-18T19:23:00.005Z"
+  },
+  {
+    "bookingId": "AGD-47553752",
+    "guestName": "A",
+    "guestPhone": "0456456456",
+    "guestEmail": "truongvandat02112004@gmail.com",
+    "roomTypeCode": "DELUXE",
+    "checkIn": "2026-06-27",
+    "checkOut": "2026-06-28",
+    "amount": 750000,
+    "status": "CONFIRMED",
+    "createdAt": "2026-06-18T19:26:02.970Z"
+  },
+  {
+    "bookingId": "AGD-23477630",
+    "guestName": "A",
+    "guestPhone": "0456456456",
+    "guestEmail": "truongvandat02112004@gmail.com",
+    "roomTypeCode": "DELUXE",
+    "checkIn": "2026-06-29",
+    "checkOut": "2026-06-30",
+    "amount": 750000,
+    "status": "CONFIRMED",
+    "createdAt": "2026-06-18T19:27:13.243Z"
+  },
+  {
+    "bookingId": "AGD-23028995",
+    "guestName": "B",
+    "guestPhone": "0456456456",
+    "guestEmail": "truongvandat02112004@gmail.com",
+    "roomTypeCode": "DELUXE",
+    "checkIn": "2026-07-13",
+    "checkOut": "2026-07-14",
+    "amount": 750000,
+    "status": "CONFIRMED",
+    "createdAt": "2026-06-18T19:32:38.572Z"
+  }
+]
