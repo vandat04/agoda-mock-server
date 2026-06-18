@@ -6,6 +6,7 @@
  */
 
 const http = require('http');
+const https = require('https');
 const fs = require('fs');
 const path = require('path');
 const url = require('url');
@@ -109,8 +110,9 @@ function formatDateToICal(dateStr) {
 // Hàm tải lịch trống từ CheckinX và phân tích các ngày đã bán hết
 function fetchAndParseCheckinxCalendar(roomTypeId, callback) {
     const icalUrl = `${CHECKINX_BASE_URL}/ical/room-type/${roomTypeId}.ics`;
+    const client = icalUrl.startsWith('https') ? https : http;
     
-    http.get(icalUrl, (res) => {
+    client.get(icalUrl, (res) => {
         if (res.statusCode !== 200) {
             callback(new Error(`CheckinX returned status ${res.statusCode}`), null);
             return;
@@ -204,7 +206,7 @@ function sendWebhookToCheckinX(booking, callback) {
     const parsedUrl = url.parse(CHECKINX_API_URL);
     const options = {
         hostname: parsedUrl.hostname,
-        port: parsedUrl.port || 80,
+        port: parsedUrl.port || (CHECKINX_API_URL.startsWith('https') ? 443 : 80),
         path: parsedUrl.path,
         method: 'POST',
         headers: {
@@ -213,7 +215,8 @@ function sendWebhookToCheckinX(booking, callback) {
         }
     };
 
-    const req = http.request(options, (res) => {
+    const client = CHECKINX_API_URL.startsWith('https') ? https : http;
+    const req = client.request(options, (res) => {
         let body = '';
         res.setEncoding('utf8');
         res.on('data', (chunk) => body += chunk);
