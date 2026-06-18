@@ -1,8 +1,7 @@
 /**
  * Agoda Mock Server - Chức năng giả lập Channel Manager phục vụ thử nghiệm và đồ án
  * Chạy độc lập, không phụ thuộc vào npm packages (Zero Dependencies).
- * Cổng mặc định: 3000
- * Chạy bằng lệnh: node agoda_mock_server.js
+ * Hỗ trợ chạy cả Standalone (local) và Serverless Function (Vercel).
  */
 
 const http = require('http');
@@ -12,13 +11,15 @@ const path = require('path');
 const url = require('url');
 
 const PORT = process.env.PORT || 3000;
-const CHECKINX_BASE_URL = process.env.RENDER
+
+// Tự động phát hiện môi trường chạy để chọn endpoint CheckinX phù hợp
+const CHECKINX_BASE_URL = (process.env.RENDER || process.env.VERCEL)
     ? 'https://hotel-booking-v3.onrender.com/api'
     : 'http://localhost:8080/api';
 const CHECKINX_API_URL = `${CHECKINX_BASE_URL}/admin/ota-channels/booking`;
 
-// Bộ nhớ đệm lưu danh sách đặt phòng giả lập trên Agoda (Được lưu trong file mock_bookings.json để tránh mất khi restart)
-const BOOKINGS_FILE = path.join(__dirname, 'mock_bookings.json');
+// Bộ nhớ đệm lưu danh sách đặt phòng giả lập trên Agoda (Được lưu trong file mock_bookings.json)
+const BOOKINGS_FILE = path.join(process.cwd(), 'mock_bookings.json');
 let mockBookings = [];
 
 try {
@@ -40,20 +41,24 @@ try {
                 createdAt: new Date().toISOString()
             }
         ];
-        fs.writeFileSync(BOOKINGS_FILE, JSON.stringify(mockBookings, null, 2), 'utf8');
-        console.log(`[Database] Đã khởi tạo file mock_bookings.json`);
+        try {
+            fs.writeFileSync(BOOKINGS_FILE, JSON.stringify(mockBookings, null, 2), 'utf8');
+            console.log(`[Database] Đã khởi tạo file mock_bookings.json`);
+        } catch (errWrite) {
+            console.warn("[Database] Không thể ghi file khởi tạo (có thể đang chạy ở môi trường read-only như Vercel):", errWrite.message);
+        }
     }
 } catch (e) {
     console.error("Lỗi đọc/ghi file mock_bookings.json:", e.message);
     mockBookings = [];
 }
 
-// Hàm lưu booking vào file
+// Hàm lưu booking vào file (Sẽ bỏ qua nếu filesystem bị read-only)
 function saveBookingsToFile() {
     try {
         fs.writeFileSync(BOOKINGS_FILE, JSON.stringify(mockBookings, null, 2), 'utf8');
     } catch (e) {
-        console.error("Lỗi lưu file mock_bookings.json:", e.message);
+        console.warn("[Database] Không thể lưu file mock_bookings.json (chạy trên Vercel file sẽ được giữ tạm thời trong RAM):", e.message);
     }
 }
 
@@ -88,7 +93,6 @@ function generateICal(roomType) {
         
         // iCal all-day format
         const start = formatDateToICal(booking.checkIn);
-        // Trong iCal, DTEND là ngày check-out (ngày tiếp theo không tính đêm cuối)
         const end = formatDateToICal(booking.checkOut);
         
         ics.push(`DTSTART;VALUE=DATE:${start}`);
@@ -102,7 +106,6 @@ function generateICal(roomType) {
     return ics.join("\r\n");
 }
 
-// Hàm phụ trợ định dạng ngày iCal (YYYYMMDD)
 function formatDateToICal(dateStr) {
     return dateStr.replace(/-/g, '');
 }
@@ -123,7 +126,7 @@ function fetchAndParseCheckinxCalendar(roomTypeId, callback) {
         res.on('end', () => {
             const blockedDates = [];
             const events = data.split('BEGIN:VEVENT');
-            events.shift(); // Bỏ header trước event đầu tiên
+            events.shift();
 
             events.forEach(eventStr => {
                 const startMatch = eventStr.match(/DTSTART;VALUE=DATE:(\d{8})/);
@@ -175,7 +178,7 @@ function sendWebhookToCheckinX(booking, callback) {
             nationality: "Vietnamese"
         },
         room: {
-            roomTypeCode: booking.roomTypeCode, // Phải khớp với tên loại phòng trong DB CheckinX
+            roomTypeCode: booking.roomTypeCode,
             roomTypeName: booking.roomTypeCode,
             quantity: 1,
             adults: 2,
@@ -192,7 +195,7 @@ function sendWebhookToCheckinX(booking, callback) {
             taxAmount: 0,
             serviceFee: 0,
             totalAmount: booking.amount,
-            commissionAmount: booking.amount * 0.15 // Giả lập chiết khấu 15%
+            commissionAmount: booking.amount * 0.15
         },
         payment: {
             paymentType: "CREDIT_CARD",
@@ -233,13 +236,13 @@ function sendWebhookToCheckinX(booking, callback) {
     req.end();
 }
 
-// Server chính
-const server = http.createServer((req, res) => {
+// Request Handler chính tương thích Vercel
+const handler = (req, res) => {
     const parsedUrl = url.parse(req.url, true);
     const pathname = parsedUrl.pathname;
 
     // 1. Giao diện người dùng (HTML)
-    if (req.method === 'GET' && (pathname === '/' || pathname === '/index.html')) {
+    if (req.method === 'GET' && (pathname === '/' || pathname === '/index.html' || pathname === '/api' || pathname === '/api/')) {
         res.writeHead(200, { 'Content-Type': 'text/html; charset=UTF-8' });
         res.end(getHTMLContent());
         return;
@@ -248,10 +251,9 @@ const server = http.createServer((req, res) => {
     // 2. Trả về lịch iCal động cho các loại phòng
     if (req.method === 'GET' && pathname.startsWith('/api/v1/ota/calendar/')) {
         const parts = pathname.split('/');
-        const filename = parts[parts.length - 1]; // Ví dụ: deluxe.ics
-        const roomType = filename.replace('.ics', '').replace(/-/g, ' '); // ví dụ: "deluxe"
+        const filename = parts[parts.length - 1];
+        const roomType = filename.replace('.ics', '').replace(/-/g, ' ');
         
-        // Map tên viết tắt sang tên phòng đầy đủ trong DB
         let normalizedRoomType = "DELUXE";
         if (roomType.toLowerCase() === "suite" || roomType.toLowerCase() === "vip") {
             normalizedRoomType = "VIP";
@@ -285,7 +287,6 @@ const server = http.createServer((req, res) => {
                     return;
                 }
 
-                // Tạo đối tượng booking
                 const newBooking = {
                     bookingId: "AGD-" + Math.floor(Math.random() * 90000000 + 10000000),
                     guestName: data.guestName,
@@ -299,7 +300,6 @@ const server = http.createServer((req, res) => {
                     createdAt: new Date().toISOString()
                 };
 
-                // Gọi Webhook đồng bộ sang CheckinX Spring Boot trước
                 sendWebhookToCheckinX(newBooking, (err, result) => {
                     if (err) {
                         console.error("Lỗi gửi Webhook đồng bộ:", err.message);
@@ -312,11 +312,9 @@ const server = http.createServer((req, res) => {
                         return;
                     }
 
-                    // Log kết quả trả về từ CheckinX
                     console.log(`[Webhook] CheckinX Response Code: ${result.statusCode}, Body: ${result.body}`);
 
                     if (result.statusCode >= 200 && result.statusCode < 300) {
-                        // Thêm vào danh sách nội bộ sau khi đồng bộ thành công và lưu lại vào file
                         mockBookings.push(newBooking);
                         saveBookingsToFile();
                         res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -327,7 +325,6 @@ const server = http.createServer((req, res) => {
                             webhookResponse: JSON.parse(result.body || '{}')
                         }));
                     } else {
-                        // CheckinX báo lỗi (Ví dụ: hết phòng)
                         let errResponse = {};
                         try { errResponse = JSON.parse(result.body); } catch(e) {}
                         res.writeHead(result.statusCode, { 'Content-Type': 'application/json' });
@@ -358,12 +355,10 @@ const server = http.createServer((req, res) => {
     if (req.method === 'GET' && pathname === '/api/blocked-dates') {
         const roomType = parsedUrl.query.roomType || 'DELUXE';
         
-        // Map sang ID loại phòng tương ứng của CheckinX
         let roomTypeId = 2; // Deluxe mặc định
         if (roomType.toUpperCase() === 'STANDARD') roomTypeId = 1;
         if (roomType.toUpperCase() === 'VIP') roomTypeId = 3;
 
-        // Tính toán các ngày hết phòng dựa trên danh sách mock local trước
         const localBlocked = [];
         const filtered = mockBookings.filter(b => normalizeRoomType(b.roomTypeCode) === roomType.toUpperCase() && b.status === "CONFIRMED");
         filtered.forEach(b => {
@@ -381,7 +376,6 @@ const server = http.createServer((req, res) => {
                 console.warn(`[Blocked Dates] Không kết nối được CheckinX cho loại phòng ID ${roomTypeId}. Dùng lịch local.`);
                 res.end(JSON.stringify(localBlocked));
             } else {
-                // Hợp nhất ngày bị khóa từ hệ thống CheckinX và các giao dịch đặt phòng local trên Agoda Mock
                 const mergedBlocked = Array.from(new Set([...systemBlocked, ...localBlocked]));
                 res.end(JSON.stringify(mergedBlocked));
             }
@@ -404,17 +398,22 @@ const server = http.createServer((req, res) => {
     // 404 Không tìm thấy
     res.writeHead(404, { 'Content-Type': 'text/plain' });
     res.end('Not Found');
-});
+};
 
-// Khởi tạo máy chủ lắng nghe
-server.listen(PORT, () => {
-    console.log(`=======================================================`);
-    console.log(`🚀 MÁY CHỦ AGODA MOCK ĐANG CHẠY TẠI: http://localhost:${PORT}`);
-    console.log(`🔗 Link iCal Deluxe: http://localhost:${PORT}/api/v1/ota/calendar/deluxe.ics`);
-    console.log(`🔗 Link iCal Suite:  http://localhost:${PORT}/api/v1/ota/calendar/vip.ics`);
-    console.log(`🔗 Webhook đồng bộ:  ${CHECKINX_API_URL}`);
-    console.log(`=======================================================`);
-});
+// Khởi động lắng nghe cổng khi chạy standalone (local)
+if (require.main === module || !process.env.VERCEL) {
+    const server = http.createServer(handler);
+    server.listen(PORT, () => {
+        console.log(`=======================================================`);
+        console.log(`🚀 MÁY CHỦ AGODA MOCK ĐANG CHẠY TẠI: http://localhost:${PORT}`);
+        console.log(`🔗 Link iCal Deluxe: http://localhost:${PORT}/api/v1/ota/calendar/deluxe.ics`);
+        console.log(`🔗 Link iCal Suite:  http://localhost:${PORT}/api/v1/ota/calendar/vip.ics`);
+        console.log(`🔗 Webhook đồng bộ:  ${CHECKINX_API_URL}`);
+        console.log(`=======================================================`);
+    });
+}
+
+module.exports = handler;
 
 // HTML giao diện tích hợp trong file để dễ chạy
 function getHTMLContent() {
@@ -683,7 +682,7 @@ function getHTMLContent() {
             </div>
             <div style="text-align: right">
                 <span class="status-badge" style="background-color: rgba(255,255,255,0.2); color: white;">
-                    <i class="fa-solid fa-server" style="margin-right: 4px;"></i> Online
+                     Online
                 </span>
             </div>
         </header>
@@ -777,12 +776,10 @@ function getHTMLContent() {
     <div id="toast" class="toast"></div>
 
     <script>
-        // Cập nhật text liên kết iCal với IP/port thực tế
         const base = window.location.origin;
         document.getElementById('deluxeLink').href = base + '/api/v1/ota/calendar/deluxe.ics';
         document.getElementById('deluxeLink').innerText = base + '/api/v1/ota/calendar/deluxe.ics';
 
-        // Lấy danh sách booking và render
         async function fetchBookings() {
             try {
                 const res = await fetch('/api/bookings');
@@ -814,7 +811,6 @@ function getHTMLContent() {
             }
         }
 
-        // Tự động tính tiền và cập nhật giá phòng động theo dữ liệu SQL
         const roomPrices = {
             "STANDARD": 400000,
             "DELUXE": 750000,
@@ -837,8 +833,6 @@ function getHTMLContent() {
                 const diffTime = Math.abs(new Date(checkOutVal) - new Date(checkInVal));
                 const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
                 amountInput.value = (diffDays > 0 ? diffDays : 1) * pricePerNight;
-                
-                // Validate ngày chọn có trùng ngày bị khóa không
                 validateSelectedDates();
             } else {
                 amountInput.value = pricePerNight;
@@ -847,16 +841,13 @@ function getHTMLContent() {
 
         roomSelect.addEventListener('change', () => {
             updatePrice();
-            fetchBlockedDates(); // Tải lại lịch trống của loại phòng mới
+            fetchBlockedDates();
         });
         checkInInput.addEventListener('change', updatePrice);
         checkOutInput.addEventListener('change', updatePrice);
 
-        // ================================================================
-        // === INTERACTIVE CALENDAR LOGIC ===
-        // ================================================================
         let currentYear = 2026;
-        let currentMonth = 5; // 0-indexed (Tháng 6)
+        let currentMonth = 5; 
         let blockedDates = [];
 
         async function fetchBlockedDates() {
@@ -878,20 +869,15 @@ function getHTMLContent() {
             const firstDay = new Date(currentYear, currentMonth, 1);
             const lastDay = new Date(currentYear, currentMonth + 1, 0);
 
-            // Tìm cột bắt đầu (Thứ 2 -> Chủ Nhật)
-            // firstDay.getDay() trả về: 0 (CN), 1 (T2), ..., 6 (T7)
             let startCol = firstDay.getDay() - 1;
-            if (startCol < 0) startCol = 6; // Chủ Nhật là cột cuối cùng
+            if (startCol < 0) startCol = 6;
 
-            // Tiêu đề tháng
             document.getElementById('calendarMonthTitle').innerText = 'Tháng ' + (currentMonth + 1).toString().padStart(2, '0') + ' / ' + currentYear;
 
-            // Tạo các ô trống đầu dòng
             for (let i = 0; i < startCol; i++) {
                 grid.innerHTML += \`<div style="padding: 10px 0; opacity: 0;"></div>\`;
             }
 
-            // Render các ngày trong tháng
             const totalDays = lastDay.getDate();
             for (let day = 1; day <= totalDays; day++) {
                 const dateObj = new Date(currentYear, currentMonth, day);
@@ -908,13 +894,11 @@ function getHTMLContent() {
             }
         }
 
-        // Chọn nhanh ngày trên lịch
         window.selectDay = (dateStr, isBlocked) => {
             if (isBlocked) {
                 showToast("Ngày này đã hết phòng trên CheckinX, không thể đặt!", "danger");
                 return;
             }
-            // Điền nhanh vào form
             if (!checkInInput.value || (checkInInput.value && checkOutInput.value)) {
                 checkInInput.value = dateStr;
                 checkOutInput.value = '';
@@ -932,7 +916,6 @@ function getHTMLContent() {
             }
         };
 
-        // Rà soát tính hợp lệ của khoảng ngày được chọn
         function validateSelectedDates() {
             const checkInVal = checkInInput.value;
             const checkOutVal = checkOutInput.value;
@@ -965,7 +948,6 @@ function getHTMLContent() {
             return true;
         }
 
-        // Điều hướng tháng
         document.getElementById('btnPrevMonth').addEventListener('click', () => {
             currentMonth--;
             if (currentMonth < 0) {
@@ -984,7 +966,6 @@ function getHTMLContent() {
             renderCalendar();
         });
 
-        // Xử lý tạo booking
         document.getElementById('bookForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             if (!validateSelectedDates()) return;
@@ -1013,14 +994,13 @@ function getHTMLContent() {
                 const result = await res.json();
                 if (res.ok && result.success) {
                     showToast(result.message, 'success');
-                    // Reset form
                     document.getElementById('guestName').value = '';
                     document.getElementById('guestPhone').value = '';
                     document.getElementById('guestEmail').value = '';
                     document.getElementById('checkIn').value = '';
                     document.getElementById('checkOut').value = '';
                     fetchBookings();
-                    fetchBlockedDates(); // Cập nhật lại lịch trống ngay lập tức
+                    fetchBlockedDates();
                 } else {
                     showToast(result.message || 'Lỗi đặt phòng!', 'danger');
                 }
@@ -1042,11 +1022,8 @@ function getHTMLContent() {
             }, 5000);
         }
 
-        // Khởi động ban đầu
         fetchBookings();
         fetchBlockedDates();
-
-        // Định kỳ quét lịch trống từ CheckinX mỗi 30 giây để cập nhật trạng thái phòng bận
         setInterval(fetchBlockedDates, 30000);
     </script>
 </body>

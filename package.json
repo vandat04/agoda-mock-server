@@ -2,9 +2,9 @@
   "name": "agoda-mock-server",
   "version": "1.0.0",
   "description": "Simulated Channel Manager for CheckinX student project",
-  "main": "agoda_mock_server.js",
+  "main": "api/index.js",
   "scripts": {
-    "start": "node agoda_mock_server.js"
+    "start": "node api/index.js"
   },
   "dependencies": {},
   "engines": {
