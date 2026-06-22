@@ -33,10 +33,10 @@ try {
                 guestName: "Nguyen Van A",
                 guestPhone: "0912345678",
                 guestEmail: "nguyenvana@gmail.com",
-                roomTypeCode: "DELUXE",
+                roomTypeCode: "STANDARD",
                 checkIn: "2026-07-01",
                 checkOut: "2026-07-03",
-                amount: 1500000,
+                amount: 800000,
                 status: "CONFIRMED",
                 createdAt: new Date().toISOString()
             }
@@ -254,7 +254,7 @@ const handler = (req, res) => {
         const filename = parts[parts.length - 1];
         const roomType = filename.replace('.ics', '').replace(/-/g, ' ');
         
-        let normalizedRoomType = "DELUXE";
+        let normalizedRoomType = "STANDARD";
         if (roomType.toLowerCase() === "suite" || roomType.toLowerCase() === "vip") {
             normalizedRoomType = "VIP";
         } else if (roomType.toLowerCase() === "standard") {
@@ -353,10 +353,10 @@ const handler = (req, res) => {
 
     // 5. API nhận danh sách ngày hết phòng từ CheckinX qua iCal
     if (req.method === 'GET' && pathname === '/api/blocked-dates') {
-        const roomType = parsedUrl.query.roomType || 'DELUXE';
+        const roomType = parsedUrl.query.roomType || 'STANDARD';
         
-        let roomTypeId = 2; // Deluxe mặc định
-        if (roomType.toUpperCase() === 'STANDARD') roomTypeId = 1;
+        let roomTypeId = 1; // Standard mặc định
+        if (roomType.toUpperCase() === 'DELUXE') roomTypeId = 2;
         if (roomType.toUpperCase() === 'VIP') roomTypeId = 3;
 
         const localBlocked = [];
@@ -406,7 +406,7 @@ if (require.main === module || !process.env.VERCEL) {
     server.listen(PORT, () => {
         console.log(`=======================================================`);
         console.log(`🚀 MÁY CHỦ AGODA MOCK ĐANG CHẠY TẠI: http://localhost:${PORT}`);
-        console.log(`🔗 Link iCal Deluxe: http://localhost:${PORT}/api/v1/ota/calendar/deluxe.ics`);
+        console.log(`🔗 Link iCal Standard: http://localhost:${PORT}/api/v1/ota/calendar/standard.ics`);
         console.log(`🔗 Link iCal Suite:  http://localhost:${PORT}/api/v1/ota/calendar/vip.ics`);
         console.log(`🔗 Webhook đồng bộ:  ${CHECKINX_API_URL}`);
         console.log(`=======================================================`);
@@ -708,7 +708,7 @@ function getHTMLContent() {
                 <div class="form-group">
                     <label>Loại Phòng (Khớp với CheckinX Database)</label>
                     <select id="roomTypeCode" required>
-                        <option value="DELUXE">DELUXE (750,000 VND/ngày)</option>
+                        <option value="STANDARD">STANDARD (400,000 VND/ngày)</option>
                     </select>
                 </div>
                 <div class="grid-2">
@@ -723,7 +723,7 @@ function getHTMLContent() {
                 </div>
                 <div class="form-group">
                     <label>Tổng số tiền (VND)</label>
-                    <input type="number" id="amount" value="1200000" required>
+                    <input type="number" id="amount" value="400000" required>
                 </div>
                 <button type="submit" id="btnSubmit">
                     <i class="fa-solid fa-credit-card"></i> Thanh toán & Đồng bộ Webhook
@@ -733,7 +733,7 @@ function getHTMLContent() {
             <div class="feed-links">
                 <label><i class="fa-solid fa-rss"></i> Đường dẫn iCal Feed của Agoda Mock:</label>
                 <span style="font-size: 11px; color: var(--text-muted);">Dán link này vào cấu hình iCal của CheckinX để đồng bộ ngược:</span>
-                <a href="/api/v1/ota/calendar/deluxe.ics" target="_blank" id="deluxeLink"></a>
+                <a href="/api/v1/ota/calendar/standard.ics" target="_blank" id="standardLink"></a>
             </div>
         </div>
 
@@ -777,8 +777,8 @@ function getHTMLContent() {
 
     <script>
         const base = window.location.origin;
-        document.getElementById('deluxeLink').href = base + '/api/v1/ota/calendar/deluxe.ics';
-        document.getElementById('deluxeLink').innerText = base + '/api/v1/ota/calendar/deluxe.ics';
+        document.getElementById('standardLink').href = base + '/api/v1/ota/calendar/standard.ics';
+        document.getElementById('standardLink').innerText = base + '/api/v1/ota/calendar/standard.ics';
 
         async function fetchBookings() {
             try {
